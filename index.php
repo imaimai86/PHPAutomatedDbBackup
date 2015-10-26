@@ -9,7 +9,7 @@ include_once 'Db_BackupClass.php';
 
 
 $dbBackupObj = new Db_Backup();
-$options = array('db_user' => 'root', 'db_name' => 'admin_wiki_new', 'db_pass' => '', );
+$options = array('db_user' => '****', 'db_name' => '*****', 'db_pass' => '*****', );
 $dbBackupObj->setCredentials($options);
 $dbBackupObj->executeBackup();
 ?>
