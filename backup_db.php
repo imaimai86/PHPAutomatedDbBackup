@@ -13,10 +13,10 @@ $connection = new connection();
 $connection->connect();
 
 $current_time = date('Y-m-d H:i');
-//$current_time = '12:01';
+$current_time = '12:01';
 
 
-$sql = "SELECT * FROM  `table_credentials` WHERE DATE_FORMAT(scheduled_execution_time,'%H:%i') = '$current_time' ";
+$sql = "SELECT * FROM  `table_credentials` WHERE DATE_FORMAT(scheduled_execution_time,'%H:%i') = '$current_time' AND is_active = '1' ";
 $result = $connection->execute($sql);
 
 $dbList = array();

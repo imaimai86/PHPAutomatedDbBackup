@@ -68,6 +68,7 @@ class Db_Backup {
     function connectDb() {
         $this->db_connection_link = mysql_connect($this->db_host, $this->db_user, $this->db_pass);
         mysql_select_db($this->db_name, $this->db_connection_link);
+        mysql_query("SET NAMES 'utf8'");
     }
 
     function php_backup_tables()
@@ -134,7 +135,7 @@ class Db_Backup {
         $this->prepare_dump_name();
         //save file
         $handle = fopen($this->dump_file_name.'.sql','w+');
-        if (fwrite($handle, $return)) {
+        if (fwrite($handle, utf8_encode($return))) {
             fclose($handle);
             return true;
         } else {
