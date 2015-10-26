@@ -8,8 +8,9 @@
 class Db_Backup {
 
     private $db_host = 'localhost', $db_user,  $db_pass,  $db_name,  $db_tables = '*', $db_connection_link = false;
-    private $is_exec, $is_dump, $dump_function = 'php_backup_tables';
-    public $dump_location = '', $dump_prefix = 'db_bu_{db_name}_{date_time}.sql';
+    private $is_exec, $is_dump, $dump_function = 'php_backup_tables', $dump_file_name;
+    public $dump_location = 'DB_BU', $dump_prefix = 'db_bu_{db_name}_{date_time}.sql';
+    public $connectionObj;
 
     /**
      * Constructor function
@@ -20,16 +21,37 @@ class Db_Backup {
         $this->checkEnvironment();
     }
 
-    public function executeBackup() {
+    public function __destruct()
+    {
+        if ($this->db_connection_link) {
+            mysql_close($this->db_connection_link);
+        }
+    }
 
-        echo "<br />$this->dump_function<br />";
-        $this->{$this->dump_function}();
+    public function executeBackup() {
+        $result = false;
+        if (!empty($this->dump_location)) {
+            if (file_exists($this->dump_location) && is_dir($this->dump_location) && is_writable($this->dump_location)) {
+                //echo "<br />$this->dump_function<br />";
+                $result = $this->{$this->dump_function}();
+            }
+        }
+
         //Check if exec is enabled
         //Check if mysqldump function is available
+        //If yes select function that uses mysqldump
 
+        return $result;
     }
 
     private function checkEnvironment() {
+        if (!file_exists($this->dump_location)) mkdir($this->dump_location);
+        if (file_exists(!$this->dump_location) OR !is_dir($this->dump_location) OR !is_writable($this->dump_location)){
+            //Send Email - permission issue
+
+            exit("<br><br> Permission issue with dump location");
+        }
+
         $this->is_exec = false;
         $this->is_dump = false;
         $this->dump_function = 'php_backup_tables';
@@ -43,18 +65,20 @@ class Db_Backup {
         }
     }
 
-    function php_backup_tables()
-    {
-        //$host = ,$user,$pass,$name,$tables = '*'
-
+    function connectDb() {
         $this->db_connection_link = mysql_connect($this->db_host, $this->db_user, $this->db_pass);
         mysql_select_db($this->db_name, $this->db_connection_link);
+    }
 
+    function php_backup_tables()
+    {
+        $this->connectDb();
+        //echo "<br><br>Database: $this->db_name<br>";
         //get all of the tables
         if($this->db_tables == '*')
         {
             $this->db_tables = array();
-            $result = mysql_query('SHOW TABLES');
+            $result = mysql_query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'", $this->db_connection_link);
             while($row = mysql_fetch_row($result))
             {
                 $this->db_tables[] = $row[0];
@@ -64,17 +88,17 @@ class Db_Backup {
         {
             $tables = is_array($this->db_tables) ? $this->db_tables : explode(',', $this->db_tables);
         }
-
+        $return = '';
         //cycle through
         foreach($this->db_tables as $table)
         {
-            $return = '';
-            $result = mysql_query('SELECT * FROM '.$table);
+            //echo "<br>Table: $table";
+            $result = mysql_query('SELECT * FROM '.$table, $this->db_connection_link);
             $num_fields = mysql_num_fields($result);
 
-            $return.= 'DROP TABLE '.$table.';';
-            $row2 = mysql_fetch_row(mysql_query('SHOW CREATE TABLE '.$table));
-            $return.= "\n\n".$row2[1].";\n\n";
+            $return.= 'DROP TABLE IF EXISTS '.$table.';';
+            $row2 = mysql_fetch_row(mysql_query('SHOW CREATE TABLE '.$table, $this->db_connection_link));
+            $return.= "\r\n\r\n".$row2[1].";\r\n\r\n";
 
             for ($i = 0; $i < $num_fields; $i++)
             {
@@ -84,32 +108,44 @@ class Db_Backup {
                     for($j=0; $j<$num_fields; $j++)
                     {
                         $row[$j] = addslashes($row[$j]);
-                        $row[$j] = ereg_replace("\n","\\n",$row[$j]);
-                        if (isset($row[$j])) { $return.= '"'.$row[$j].'"' ; } else { $return.= '""'; }
+                        $row[$j] = str_replace("\n","\\n",$row[$j]);
+                        if (isset($row[$j])) {
+                            if ($row[$j] == null) {
+                                $return .= 'null';
+                            } else {
+                                $return .= '"' . $row[$j] . '"';
+                            }
+                        } else {
+                            $return.= '""';
+                        }
                         if ($j<($num_fields-1)) { $return.= ','; }
                     }
-                    $return.= ");\n";
+                    $return.= ");\r\n";
                 }
             }
-            $return.="\n\n\n";
+            $return.="\r\n\r\n\r\n";
         }
 
 
-        $this->save_dump($return);
+        return $this->save_dump($return);
     }
 
     private function save_dump($return) {
         $this->prepare_dump_name();
         //save file
         $handle = fopen($this->dump_file_name.'.sql','w+');
-        fwrite($handle,$return);
-        fclose($handle);
+        if (fwrite($handle, $return)) {
+            fclose($handle);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private function prepare_dump_name() {
         $dump_file_name = !empty($this->dump_prefix) ? $this->dump_prefix : 'DB_BACKUP_'.$this->db_name;
         $dump_file_name = str_replace('{db_name}', $this->db_name, $dump_file_name);
         $dump_file_name = str_replace('{date_time}', date('Y.m.d.H.i.s'), $dump_file_name);
-        $this->dump_file_name = $this->dump_location.$dump_file_name;
+        $this->dump_file_name = (!empty($this->dump_location) ? $this->dump_location.'/' : '').$dump_file_name;
     }
 }
