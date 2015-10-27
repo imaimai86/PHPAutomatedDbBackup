@@ -89,11 +89,15 @@ class Db_Backup {
         {
             $tables = is_array($this->db_tables) ? $this->db_tables : explode(',', $this->db_tables);
         }
-        $return = '';
+
+        $return = "\r\n\r\n".' -- Generation Time: '.date('M d, Y at H:i').' '."\r\n\r\n";
+        $return .= "\r\n\r\n".' SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO";'."\r\n";
+        $return .= "\r\n".' -- Table structures and data '."\r\n\r\n";
         //cycle through
         foreach($this->db_tables as $table)
         {
             //echo "<br>Table: $table";
+            $return .= "\r\n -- Table structure of \"$table\" \r\n\r\n";
             $result = mysql_query('SELECT * FROM '.$table, $this->db_connection_link);
             $num_fields = mysql_num_fields($result);
 
@@ -112,7 +116,7 @@ class Db_Backup {
                         $row[$j] = str_replace("\n","\\n",$row[$j]);
                         if (isset($row[$j])) {
                             if ($row[$j] == null) {
-                                $return .= 'null';
+                                $return .= "''";
                             } else {
                                 $return .= '"' . $row[$j] . '"';
                             }
